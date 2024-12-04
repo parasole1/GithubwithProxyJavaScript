@@ -68,7 +68,9 @@ jobs:
           POLICY_LOG: t
           INVISIRISK_JWT_TOKEN: ${{secrets.VB_API_KEY}} 
           INVISIRISK_PORTAL: https://app.dev.veribom.com/
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          POLICY_URL: "https://api.github.com/repos/ir-playground/policy/tarball/main"
+          POLICY_TOKEN: ${{ secrets.POLICY_TOKEN }}
     container:
       image: node:18-alpine
       options: --cap-add=NET_ADMIN
