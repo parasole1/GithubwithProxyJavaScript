@@ -11,7 +11,7 @@ permissions:
   contents: read
   packages: read
 env:
-  API_URL: https://app.stage.veribom.com
+  API_URL: https://app.stage.invisirisk.com
 
 jobs:
   create_scan_in_IR_Portal:
