@@ -67,7 +67,7 @@ jobs:
           PSE_DEBUG_FLAG: --alsologtostderr
           POLICY_LOG: t
           INVISIRISK_JWT_TOKEN: ${{secrets.VB_API_KEY}} 
-          INVISIRISK_PORTAL: https://app.dev.veribom.com/
+          INVISIRISK_PORTAL: https://app.audit.dev.invisirisk.com/
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
     container:
       image: node:18-alpine
@@ -79,7 +79,7 @@ jobs:
     - env: 
         SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
       run: echo $SCAN_ID
-    - uses: invisirisk/pse-action@v1.0.7
+    - uses: invisirisk/pse-action@v1.0.8
       with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
