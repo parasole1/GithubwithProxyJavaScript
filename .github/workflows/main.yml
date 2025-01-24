@@ -1,14 +1,34 @@
-name: Scanner
-on: [push]
+
+name: Build NPM Package
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  checks: write
+  contents: read
+  packages: read
 env:
-  API_URL: 'https://app.audit.dev.invisirisk.com'
-  IMAGE_NAME: 'veribom-scanner:latest'
-  SCAN_LICENSE: 'False'
-  DEBUG: 'True'
-  SCAN_TYPE: 'DIRECTORY'
-  DIRECTORY_PATH: '/checkout'
+  API_URL: https://app.audit.dev.invisirisk.com
 
 jobs:
+  create_scan_in_IR_Portal:
+    runs-on: ubuntu-latest
+    outputs:
+      scan_id: ${{ steps.parseResponse.outputs.scan_id }}
+    steps:
+      - name: Initiating SBOM Scan
+        id: createScan
+        uses: fjogeleit/http-request-action@v1.15.1
+        with:
+          url: '${{env.API_URL}}/utilityapi/v1/scan'
+          method: 'POST'
+          data: '{"api_key": "${{secrets.VB_API_KEY}}"}'
+      - name: Parse Response
+        id: parseResponse
+        run: echo "scan_id=${{fromJSON(steps.createScan.outputs.response).data.scan_id}}" >> "$GITHUB_OUTPUT"
   ecr_details:
     runs-on: ubuntu-latest
     outputs:
@@ -33,49 +53,44 @@ jobs:
           echo "token=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).password}}" >> "$GITHUB_OUTPUT"
           echo "region=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).region}}" >> "$GITHUB_OUTPUT"
           echo "registry_id=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).registry_id}}" >> "$GITHUB_OUTPUT"
-  create_scan:
+          
+  start_proxy_and_build:
     runs-on: ubuntu-latest
-    outputs:
-      scan_id: ${{steps.parseResponse.outputs.scan_id}}
+    needs: [create_scan_in_IR_Portal, ecr_details]
+    services:
+      pse:
+        image: 282904853176.dkr.ecr.us-west-2.amazonaws.com/invisirisk/pse-proxy:latest
+        credentials:
+          username: ${{needs.ecr_details.outputs.ecr_username}}
+          password: ${{needs.ecr_details.outputs.ecr_token}}
+        env:
+          PSE_DEBUG_FLAG: --alsologtostderr
+          POLICY_LOG: t
+          INVISIRISK_JWT_TOKEN: ${{secrets.VB_API_KEY}} 
+          INVISIRISK_PORTAL: https://app.dev.veribom.com/
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+    container:
+      image: node:18-alpine
+      options: --cap-add=NET_ADMIN
+    strategy:
+      matrix:
+        node-version: [18.x]
     steps:
-      - name: Initiating SBOM Scan
-        id: createScan
-        uses: fjogeleit/http-request-action@v1.15.1
-        with:
-          url: '${{env.API_URL}}/utilityapi/v1/scan'
-          method: 'POST'
-          data: '{"api_key": "${{secrets.VB_API_KEY}}"}'
-      - name: Parse Response
-        id: parseResponse
-        run: echo "scan_id=${{fromJSON(steps.createScan.outputs.response).data.scan_id}}" >> "$GITHUB_OUTPUT"
-  run_scan:
-    runs-on: ubuntu-latest
-    needs: [ecr_details, create_scan]
-    outputs:
-      container_id: ${{steps.pullImage.outputs.container_id}}
-    steps:
-      - name: Pulling VB Image
-        id: pullImage
-        run: |
-            echo "${{needs.ecr_details.outputs.ecr_token}}" | docker login -u ${{needs.ecr_details.outputs.ecr_username}}             ${{needs.ecr_details.outputs.ecr_id}}.dkr.ecr.${{needs.ecr_details.outputs.ecr_region}}.amazonaws.com             --password-stdin
-            docker pull ${{needs.ecr_details.outputs.ecr_id}}.dkr.ecr.${{needs.ecr_details.outputs.ecr_region}}.amazonaws.com/$IMAGE_NAME
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      - name: Running VB Image
-        run: |
-            docker run --name scanner -v $GITHUB_WORKSPACE/:$DIRECTORY_PATH -e SCAN_LICENSE=$SCAN_LICENSE -e API_URL=$API_URL -e SCANCODE_DEBUG_PACKAGE_GRADLE=True             -e SCAN_ID=${{needs.create_scan.outputs.scan_id}} -e SCAN_TYPE=$SCAN_TYPE -e DIRECTORY_PATH=$DIRECTORY_PATH -e API_KEY=${{secrets.VB_API_KEY}}             ${{needs.ecr_details.outputs.ecr_id}}.dkr.ecr.${{needs.ecr_details.outputs.ecr_region}}.amazonaws.com/$IMAGE_NAME run_scanner
-            echo "CONTAINER_ID=$(docker ps -aqf name=^scanner$)" >> "$GITHUB_ENV"
-      - name: Checking Container Logs
-        run: |
-            set +e
-            ! docker logs $CONTAINER_ID 2>&1 | grep -qE '\| *ERROR *\|'
-            echo "SCAN_ERROR=$?" >> "$GITHUB_ENV"
-            docker rm $CONTAINER_ID
-      - name: Checking for Warnings
-        if: ${{env.SCAN_ERROR != 0}}
-        run: echo "VB Scanning Completed With Warnings"
-      - name: Checking for Warnings
-        if: ${{env.SCAN_ERROR == 0}}
-        run: echo "VB Scanning Completed"
-
+    - env: 
+        SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
+      run: echo $SCAN_ID
+    - uses: invisirisk/pse-action@v1.0.7
+      with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
+    - name: Checkout the code
+      uses: actions/checkout@v3
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+    - run: npm install
+    - run: npm ci
+    - run: npm run build --if-present
+    - run: npm test
         
