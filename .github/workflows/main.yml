@@ -11,7 +11,7 @@ permissions:
   contents: read
   packages: read
 env:
-  API_URL: https://app.stage.invisirisk.com
+  API_URL: https://app.invisirisk.com
 
 jobs:
   create_scan_in_IR_Portal:
@@ -67,7 +67,7 @@ jobs:
           PSE_DEBUG_FLAG: --alsologtostderr
           POLICY_LOG: t
           INVISIRISK_JWT_TOKEN: ${{secrets.VB_API_KEY}} 
-          INVISIRISK_PORTAL: https://app.stage.invisirisk.com/
+          INVISIRISK_PORTAL: https://app.invisirisk.com/
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
     container:
       image: node:18-alpine
