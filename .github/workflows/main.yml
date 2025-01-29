@@ -1,4 +1,5 @@
 name: Build NPM Package
+
 on:
   push:
     branches: [ main ]
@@ -7,7 +8,7 @@ on:
 
 permissions:
   checks: write
-  contents: write  # Ensure contents: write permission for pushing
+  contents: write
   packages: read
 
 env:
@@ -42,8 +43,8 @@ jobs:
         id: fetchECRDetails
         uses: fjogeleit/http-request-action@v1.15.1
         with:
-            url: '${{env.API_URL}}/utilityapi/v1/registry?api_key=${{secrets.VB_API_KEY}}'
-            method: 'GET'
+          url: '${{env.API_URL}}/utilityapi/v1/registry?api_key=${{secrets.VB_API_KEY}}'
+          method: 'GET'
       - name: Decoding VB Token
         id: parseToken
         run: echo "DECODED_TOKEN=$(echo ${{ fromJson(steps.fetchECRDetails.outputs.response).data }} | base64 -d)" >> "$GITHUB_OUTPUT"
@@ -64,12 +65,12 @@ jobs:
         credentials:
           username: ${{needs.ecr_details.outputs.ecr_username}}
           password: ${{needs.ecr_details.outputs.ecr_token}}
-        env:
-          PSE_DEBUG_FLAG: --alsologtostderr
-          POLICY_LOG: t
-          INVISIRISK_JWT_TOKEN: ${{secrets.VB_API_KEY}} 
-          INVISIRISK_PORTAL: https://app.stage.invisirisk.com/
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+    env:
+      PSE_DEBUG_FLAG: --alsologtostderr
+      POLICY_LOG: t
+      INVISIRISK_JWT_TOKEN: ${{secrets.VB_API_KEY}}
+      INVISIRISK_PORTAL: https://app.stage.invisirisk.com/
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     container:
       image: node:18-alpine
       options: --cap-add=NET_ADMIN
@@ -77,40 +78,50 @@ jobs:
       matrix:
         node-version: [18.x]
     steps:
-    - env: 
-        SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
-      run: echo $SCAN_ID
-    - uses: invisirisk/pse-action@v1.0.8
-      with:
+      - name: Print Scan ID
+        env: 
+          SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
+        run: echo $SCAN_ID
+
+      - name: PSE Action
+        uses: invisirisk/pse-action@v1.0.8
+        with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
-    - name: Checkout the code
-      uses: actions/checkout@v3
-      with:
-        token: ${{ secrets.PAT }}  # Use PAT for checkout
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-    - run: npm install
-    - run: npm ci
-    - run: npm run build --if-present
-    - run: npm test
 
-    # Configure Git
-    - name: Configure Git
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-    # Add and commit changes
-    - name: Commit changes
-      run: |
-        git add .
-        git commit -m "Automated build and test changes"
+      - name: Configure Git
+        run: |
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-    # Push changes
-    - name: Push changes
-      run: |
-        git remote set-url origin https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
-        git push origin main
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm ci
+
+      - name: Build and test
+        run: |
+          npm run build --if-present
+          npm test
+
+      - name: Commit and push changes
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add .
+            git commit -m "chore: automated build and test updates [skip ci]"
+            git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+          else
+            echo "No changes to commit"
+          fi
