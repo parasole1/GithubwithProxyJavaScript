@@ -4,14 +4,15 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
- 
+
 permissions:
   checks: write
-  contents: read
+  contents: write  # Ensure contents: write permission for pushing
   packages: read
+
 env:
   API_URL: https://app.stage.invisirisk.com
- 
+
 jobs:
   create_scan_in_IR_Portal:
     runs-on: ubuntu-latest
@@ -28,6 +29,7 @@ jobs:
       - name: Parse Response
         id: parseResponse
         run: echo "scan_id=${{fromJSON(steps.createScan.outputs.response).data.scan_id}}" >> "$GITHUB_OUTPUT"
+
   ecr_details:
     runs-on: ubuntu-latest
     outputs:
@@ -52,6 +54,7 @@ jobs:
           echo "token=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).password}}" >> "$GITHUB_OUTPUT"
           echo "region=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).region}}" >> "$GITHUB_OUTPUT"
           echo "registry_id=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).registry_id}}" >> "$GITHUB_OUTPUT"
+
   start_proxy_and_build:
     runs-on: ubuntu-latest
     needs: [create_scan_in_IR_Portal, ecr_details]
@@ -83,12 +86,31 @@ jobs:
           SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
     - name: Checkout the code
       uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.PAT }}  # Use PAT for checkout
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
     - run: npm install
-    # - run: git push
     - run: npm ci
     - run: npm run build --if-present
     - run: npm test
+
+    # Configure Git
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    # Add and commit changes
+    - name: Commit changes
+      run: |
+        git add .
+        git commit -m "Automated build and test changes"
+
+    # Push changes
+    - name: Push changes
+      run: |
+        git remote set-url origin https://${{ secrets.PAT }}@github.com/${{ github.repository }}.git
+        git push origin main
