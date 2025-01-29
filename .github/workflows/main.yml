@@ -8,7 +8,7 @@ on:
 
 permissions:
   checks: write
-  contents: write  # Add write permission for contents
+  contents: write
   packages: read
 
 env:
@@ -78,17 +78,19 @@ jobs:
       matrix:
         node-version: [18.x]
     steps:
-      - env: 
-          SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
-        run: echo $SCAN_ID
+      - name: Debug Environment Variables
+        run: |
+          echo "SCAN_ID: $SCAN_ID"
+          echo "API_URL: $API_URL"
+          echo "GITHUB_TOKEN: $GITHUB_TOKEN"
       - uses: invisirisk/pse-action@v1.0.8
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+        env:
           SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout the code
         uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GITHUB_PAT }}  # Use PAT for authentication
+          token: ${{ secrets.GITHUB_PAT }}  # Or use ${{ secrets.GITHUB_TOKEN }}
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -97,14 +99,10 @@ jobs:
       - run: npm ci
       - run: npm run build --if-present
       - run: npm test
-      - name: Configure Git
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
       - name: Commit and Push Changes
         run: |
           git add .
           git commit -m "Automated build and test updates"
           git push origin main
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}  # Use PAT for authentication
+          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}  # Or use ${{ secrets.GITHUB_TOKEN }}
