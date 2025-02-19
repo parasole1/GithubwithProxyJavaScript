@@ -1,10 +1,6 @@
 name: Build NPM Package
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch: # This line allows the workflow to be triggered manually
 
 permissions:
