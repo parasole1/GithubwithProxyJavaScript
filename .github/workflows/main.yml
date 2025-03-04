@@ -1,16 +1,19 @@
-name: Build and Test with Proxy
-
+name: Build NPM Package
 on:
-  workflow_dispatch:
-    inputs:
-      example_input:
-        description: 'An example input'
-        required: false
-        default: 'default_value'
+     workflow_dispatch:
+
+permissions:
+  checks: write
+  contents: read
+  packages: read
+env:
+  API_URL: https://app.veribom.com
 
 jobs:
-  setup_scan:
+  create_scan_in_IR_Portal:
     runs-on: ubuntu-latest
+    outputs:
+      scan_id: ${{ steps.parseResponse.outputs.scan_id }}
     steps:
       - name: Initiating SBOM Scan
         id: createScan
@@ -18,12 +21,10 @@ jobs:
         with:
           url: '${{env.API_URL}}/utilityapi/v1/scan'
           method: 'POST'
-          data: '{"api_key": "${{secrets.VB_API_KEY}}"}'
-
+          data: '{"api_key": "${{secrets.VB_API_KEY_PROD}}"}'
       - name: Parse Response
         id: parseResponse
         run: echo "scan_id=${{fromJSON(steps.createScan.outputs.response).data.scan_id}}" >> "$GITHUB_OUTPUT"
-
   ecr_details:
     runs-on: ubuntu-latest
     outputs:
@@ -36,13 +37,11 @@ jobs:
         id: fetchECRDetails
         uses: fjogeleit/http-request-action@v1.15.1
         with:
-          url: '${{env.API_URL}}/utilityapi/v1/registry?api_key=${{secrets.VB_API_KEY}}'
-          method: 'GET'
-      
+            url: '${{env.API_URL}}/utilityapi/v1/registry?api_key=${{secrets.VB_API_KEY_PROD}}'
+            method: 'GET'
       - name: Decoding VB Token
         id: parseToken
         run: echo "DECODED_TOKEN=$(echo ${{ fromJson(steps.fetchECRDetails.outputs.response).data }} | base64 -d)" >> "$GITHUB_OUTPUT"
-      
       - name: ECR Details
         id: ecr_details
         run: |
@@ -50,73 +49,42 @@ jobs:
           echo "token=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).password}}" >> "$GITHUB_OUTPUT"
           echo "region=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).region}}" >> "$GITHUB_OUTPUT"
           echo "registry_id=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).registry_id}}" >> "$GITHUB_OUTPUT"
-
+          
   start_proxy_and_build:
     runs-on: ubuntu-latest
-    needs: [setup_scan, ecr_details]  # This job depends on the above two jobs
+    needs: [create_scan_in_IR_Portal, ecr_details]
     services:
       pse:
         image: 282904853176.dkr.ecr.us-west-2.amazonaws.com/invisirisk/pse-proxy:latest
         credentials:
           username: ${{needs.ecr_details.outputs.ecr_username}}
           password: ${{needs.ecr_details.outputs.ecr_token}}
-    env:
-      PSE_DEBUG_FLAG: --alsologtostderr
-      POLICY_LOG: t
-      INVISIRISK_JWT_TOKEN: ${{secrets.VB_API_KEY}}
-      INVISIRISK_PORTAL: https://app.stage.invisirisk.com/
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          PSE_DEBUG_FLAG: --alsologtostderr
+          POLICY_LOG: t
+          INVISIRISK_JWT_TOKEN: ${{secrets.VB_API_KEY_PROD}} 
+          INVISIRISK_PORTAL:  https://app.veribom.com
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
     container:
       image: node:18-alpine
-      options: --cap-add=NET_ADMIN --dns=8.8.8.8
+      options: --cap-add=NET_ADMIN
     strategy:
       matrix:
         node-version: [18.x]
     steps:
-      # Step 1: Print Scan ID (for debug purposes)
-      - name: Print Scan ID
-        env: 
-          SCAN_ID: ${{ needs.setup_scan.outputs.scan_id }}
-        run: echo $SCAN_ID
-
-      # Step 2: Use PSE Action (Make sure to provide the correct GitHub token)
-      - name: PSE Action
-        uses: invisirisk/pse-action@v1.0.8
-        with:
+    - env: 
+        SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
+      run: echo $SCAN_ID
+    - uses: invisirisk/pse-action@v1.0.8
+      with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      # Step 3: Checkout the repository code
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      # Step 4: Setup Node.js
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-
-      # Step 5: Install dependencies
-      - name: Install dependencies
-        run: |
-          npm install
-          npm ci
-
-      # Step 6: Build and test the application
-      - name: Build and test
-        run: |
-          npm run build --if-present
-          npm test
-
-      # Step 7: Commit and push changes (if there are any)
-      - name: Commit and push changes
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git add .
-            git commit -m "chore: automated build and test updates [skip ci]"
-            git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-          else
-            echo "No changes to commit"
-     
+          SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
+    - name: Checkout the code
+      uses: actions/checkout@v3
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+    
+    - run: npm install -g pnpm
+    - run: pnpm install
