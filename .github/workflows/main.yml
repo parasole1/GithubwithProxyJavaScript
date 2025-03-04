@@ -1,9 +1,12 @@
 name: Build and Test with Proxy
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      example_input:
+        description: 'An example input'
+        required: false
+        default: 'default_value'
 
 jobs:
   start_proxy_and_build:
