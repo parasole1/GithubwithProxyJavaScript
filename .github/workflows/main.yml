@@ -1,10 +1,7 @@
 name: Build NPM Package
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   checks: write
