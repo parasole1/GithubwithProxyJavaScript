@@ -9,9 +9,51 @@ on:
         default: 'default_value'
 
 jobs:
+  setup_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Initiating SBOM Scan
+        id: createScan
+        uses: fjogeleit/http-request-action@v1.15.1
+        with:
+          url: '${{env.API_URL}}/utilityapi/v1/scan'
+          method: 'POST'
+          data: '{"api_key": "${{secrets.VB_API_KEY}}"}'
+
+      - name: Parse Response
+        id: parseResponse
+        run: echo "scan_id=${{fromJSON(steps.createScan.outputs.response).data.scan_id}}" >> "$GITHUB_OUTPUT"
+
+  ecr_details:
+    runs-on: ubuntu-latest
+    outputs:
+      ecr_username: ${{steps.ecr_details.outputs.username}}
+      ecr_token: ${{steps.ecr_details.outputs.token}}
+      ecr_region: ${{steps.ecr_details.outputs.region}}
+      ecr_id: ${{steps.ecr_details.outputs.registry_id}}
+    steps:
+      - name: Fetching VB Token
+        id: fetchECRDetails
+        uses: fjogeleit/http-request-action@v1.15.1
+        with:
+          url: '${{env.API_URL}}/utilityapi/v1/registry?api_key=${{secrets.VB_API_KEY}}'
+          method: 'GET'
+      
+      - name: Decoding VB Token
+        id: parseToken
+        run: echo "DECODED_TOKEN=$(echo ${{ fromJson(steps.fetchECRDetails.outputs.response).data }} | base64 -d)" >> "$GITHUB_OUTPUT"
+      
+      - name: ECR Details
+        id: ecr_details
+        run: |
+          echo "username=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).username}}" >> "$GITHUB_OUTPUT"
+          echo "token=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).password}}" >> "$GITHUB_OUTPUT"
+          echo "region=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).region}}" >> "$GITHUB_OUTPUT"
+          echo "registry_id=${{fromJSON(steps.parseToken.outputs.DECODED_TOKEN).registry_id}}" >> "$GITHUB_OUTPUT"
+
   start_proxy_and_build:
     runs-on: ubuntu-latest
-    needs: [create_scan_in_IR_Portal, ecr_details]
+    needs: [setup_scan, ecr_details]  # This job depends on the above two jobs
     services:
       pse:
         image: 282904853176.dkr.ecr.us-west-2.amazonaws.com/invisirisk/pse-proxy:latest
@@ -34,7 +76,7 @@ jobs:
       # Step 1: Print Scan ID (for debug purposes)
       - name: Print Scan ID
         env: 
-          SCAN_ID: ${{ needs.create_scan_in_IR_Portal.outputs.scan_id }}
+          SCAN_ID: ${{ needs.setup_scan.outputs.scan_id }}
         run: echo $SCAN_ID
 
       # Step 2: Use PSE Action (Make sure to provide the correct GitHub token)
@@ -77,4 +119,4 @@ jobs:
             git push https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
           else
             echo "No changes to commit"
-          fi
+     
