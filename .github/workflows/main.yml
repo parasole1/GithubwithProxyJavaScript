@@ -21,7 +21,7 @@ jobs:
         with:
           url: '${{env.API_URL}}/utilityapi/v1/scan'
           method: 'POST'
-          data: '{"api_key": "${{secrets.VB_API_KEY_PROD}}"}'
+          data: '{"api_key": "${{secrets.VB_API_KEY}}"}'
       - name: Parse Response
         id: parseResponse
         run: echo "scan_id=${{fromJSON(steps.createScan.outputs.response).data.scan_id}}" >> "$GITHUB_OUTPUT"
@@ -37,7 +37,7 @@ jobs:
         id: fetchECRDetails
         uses: fjogeleit/http-request-action@v1.15.1
         with:
-            url: '${{env.API_URL}}/utilityapi/v1/registry?api_key=${{secrets.VB_API_KEY_PROD}}'
+            url: '${{env.API_URL}}/utilityapi/v1/registry?api_key=${{secrets.VB_API_KEY}}'
             method: 'GET'
       - name: Decoding VB Token
         id: parseToken
