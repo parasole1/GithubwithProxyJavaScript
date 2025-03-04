@@ -86,9 +86,12 @@ jobs:
 
       - name: Install Composer
         run: |
-          apt-get update && apt-get install -y curl php-cli unzip
-          curl -k -sS https://getcomposer.org/installer | php
-          mv composer.phar /usr/local/bin/composer
+         apt-get update
+         apt-get install -y curl unzip
+         apt-get install -y php8.2-cli || apt-get install -y php-cli
+         curl -k -sS https://getcomposer.org/installer | php
+         mv composer.phar /usr/local/bin/composer
+
 
 
       - name: Install PHP Dependencies
