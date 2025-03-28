@@ -1,4 +1,4 @@
-name: Build JS Package For Secrets (STAGE)
+name: Build JS Package For Secrets
 on:
      workflow_dispatch:
      push:
