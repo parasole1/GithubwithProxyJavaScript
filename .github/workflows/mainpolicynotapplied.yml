@@ -1,4 +1,4 @@
-name: Build JS Package For Secrets
+name: Build JavaScript Package (policy not applied)
 on:
      workflow_dispatch:
      push:
