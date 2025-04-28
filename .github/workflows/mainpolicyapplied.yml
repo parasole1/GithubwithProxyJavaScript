@@ -16,7 +16,7 @@ jobs:
       - name: Setup PSE
         uses: invisirisk/pse-action@dev-test
         with:
-          api_url: "https://app.stage.invisirisk.com"
+          api_url: "https://app.dev.veribom.com"
           app_token: ${{ secrets.VB_API_KEY }}
           job_status: ${{job.status}}
           
