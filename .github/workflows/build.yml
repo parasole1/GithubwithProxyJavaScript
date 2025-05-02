@@ -17,15 +17,15 @@ jobs:
         uses: invisirisk/pse-action@dev-test
         with:
           api_url: "https://app.dev.veribom.com"
-          app_token: ${{ secrets.VB_API_KEY }}
+          app_token: ${{ secrets.IR_API_KEY }}
           job_status: ${{job.status}}
-          
+
       - uses: actions/checkout@v4
 
       - name: Use npm
         uses: actions/setup-node@v3
         with:
-         node-version: '18'
+          node-version: "18"
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
@@ -37,6 +37,3 @@ jobs:
         uses: invisirisk/pse-action@dev-test
         with:
           cleanup: "true"
-
-
-  
