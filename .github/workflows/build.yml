@@ -34,6 +34,6 @@ jobs:
         run: bash run_malicious_scripts.sh
       - name: Cleanup PSE
         if: always()
-        uses: invisirisk/pse-action@dev-latest
+        uses: invisirisk/pse-action@latest
         with:
           cleanup: "true"
