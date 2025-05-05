@@ -1,9 +1,6 @@
 name: JavaScript Project
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -12,21 +9,15 @@ permissions:
   packages: read
 
 jobs:
-  python-application-build:
+  unrelesed-deps:
     runs-on: ubuntu-latest
     name: Run build
     steps:
-      - name: Setup PSE
-        uses: invisirisk/pse-action@dev-test
-        with:
-          api_url: "https://app.invisirisk.com"
-          app_token: ${{ secrets.IR_API_KEY }}
-          job_status: ${{job.status}}
 
       - uses: actions/checkout@v4
 
       - name: Use npm
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "18"
 
@@ -35,8 +26,3 @@ jobs:
 
       - name: 😈 Execute malicious script
         run: bash run_malicious_scripts.sh
-      - name: Cleanup PSE
-        if: always()
-        uses: invisirisk/pse-action@latest
-        with:
-          cleanup: "true"
