@@ -27,7 +27,8 @@ jobs:
          node-version: '18'
 
       - name: Install dependencies
-        run: npm install 
+        run: npm install --legacy-peer-deps
+ 
 
       #- name: 😈 Execute malicious script
         #run: bash run_malicious_scripts.sh
