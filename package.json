@@ -359,7 +359,7 @@
     "negotiator": "^1.0.0",
     "netrc-parser": "^3.1.6",
     "newrelic": "^12.14.0",
-    "next": "^15.2.0",
+    "next": "^16.1.5",
     "node-esapi": "^0.0.1",
     "node-fetch": "^3.3.2",
     "node-releases": "^2.0.19",
